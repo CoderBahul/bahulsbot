@@ -14,4 +14,3 @@ gtts
 pydub
 ffmpeg
 pvporcupine
-streamlit pyaudio
