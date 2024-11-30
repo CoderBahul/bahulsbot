@@ -14,6 +14,3 @@ gtts
 pydub
 ffmpeg
 pvporcupine
-portaudio2
-libportaudio2-dev
-python3-dev
