@@ -15,4 +15,5 @@ pydub
 ffmpeg
 pvporcupine
 sounddevice
+sentence-transformers
 python-dotenv

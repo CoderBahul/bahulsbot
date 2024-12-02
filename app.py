@@ -8,21 +8,19 @@ import tempfile
 from PyPDF2 import PdfReader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores import FAISS
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain.embeddings import HuggingFaceEmbeddings
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.prompts import PromptTemplate
 from langchain.chains.question_answering import load_qa_chain
 from dotenv import load_dotenv
-import google.generativeai as genai
 
 # Set ffmpeg path explicitly if necessary
 AudioSegment.ffmpeg = "E:/Gemini/ffmpeg/bin/ffmpeg.exe"
 
 # Load environment variables
 load_dotenv()
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
-# Initialize the conversational model
+# Initialize conversational model
 chat_model = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.7)
 
 # Helper Functions
@@ -41,7 +39,6 @@ def speech_to_text():
     """Convert speech to text."""
     recognizer = sr.Recognizer()
     with sr.Microphone() as source:
-        st.info("Listening for your query...")
         try:
             audio = recognizer.listen(source, timeout=5)
             query = recognizer.recognize_google(audio)
@@ -52,28 +49,28 @@ def speech_to_text():
             return "Error with the speech recognition service."
 
 def detect_wakeword():
-    """Continuously listen for the wake word 'Wake Up'."""
+    """Continuously listen for the wake word 'UP'."""
     recognizer = sr.Recognizer()
-    st.info("Listening for the wake word 'Wake Up'...")
     with sr.Microphone() as source:
         while True:
             try:
-                audio = recognizer.listen(source, timeout=3, phrase_time_limit=3)
+                audio = recognizer.listen(source, timeout=10, phrase_time_limit=5)
                 query = recognizer.recognize_google(audio)
-                if "WAKE UP" in query.upper():
-                    st.success("Wake word detected: 'Wake Up'")
+                if "UP" in query.upper():
                     return True
             except sr.UnknownValueError:
-                # Continue listening
                 pass
             except sr.RequestError:
                 st.error("Microphone or recognition service error.")
                 break
     return False
 
-def get_pdf_text(pdf_docs):
-    """Extract text from uploaded PDFs."""
+def get_pdf_text(pdf_docs=None):
+    """Extract text from uploaded or default PDFs."""
     text = ""
+    if not pdf_docs:
+        default_pdf = "default.pdf"  # Path to a default PDF
+        pdf_docs = [open(default_pdf, "rb")]
     for pdf in pdf_docs:
         pdf_reader = PdfReader(pdf)
         for page in pdf_reader.pages:
@@ -87,19 +84,19 @@ def get_text_chunks(text):
 
 def create_vector_store(text_chunks):
     """Create a vector store from text chunks."""
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
     vector_store = FAISS.from_texts(text_chunks, embedding=embeddings)
     vector_store.save_local("faiss_index")
 
 def query_pdf(question):
     """Query the processed PDF data."""
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
     vector_store = FAISS.load_local("faiss_index", embeddings)
     docs = vector_store.similarity_search(question)
 
     prompt_template = """
     Answer the question as detailed as possible from the provided context. 
-    If the answer is not available in the context, say, "I couldn't find the answer in the provided PDF."
+    If the answer is not available in the context, then answer the question yourself on the level of class 9 NCERT, explaining how you answered.
     
     Context:\n{context}\n
     Question:\n{question}\n
@@ -121,25 +118,25 @@ def general_chatbot_response(query):
 
 # Main App
 def main():
-    st.set_page_config(page_title="Chat with PDF and AI", layout="wide")
-    st.title("Two-in-One Bot: PDFBot & ChatGPT Clone")
-    
-    bot_type = st.sidebar.radio("Choose Bot", ["PDFBot", "ChatGPT Clone"], index=0)
-    voice_chat_active = False  # Start with manual typing by default
+    st.set_page_config(page_title="Bahul's AI Assistant", layout="wide")
+    st.title("Bahul's Bot: Multipurpose AI Assistant")
 
-    if bot_type == "PDFBot":
-        st.subheader("PDFBot: Ask Questions from Uploaded PDFs")
+    bot_type = st.sidebar.radio(
+        "Choose Bot",
+        ["PDF Bot", "ChatBot (Typing)", "ChatBot (Voice)", "Alexa-like Bot"],
+        index=0
+    )
+
+    if bot_type == "PDF Bot":
+        st.subheader("PDF Bot: Ask Questions from Uploaded PDFs")
         pdf_docs = st.file_uploader("Upload PDF Files", accept_multiple_files=True)
 
         if st.button("Process PDFs"):
             with st.spinner("Processing..."):
-                if pdf_docs:
-                    raw_text = get_pdf_text(pdf_docs)
-                    text_chunks = get_text_chunks(raw_text)
-                    create_vector_store(text_chunks)
-                    st.success("PDFs processed successfully! You can now ask questions.")
-                else:
-                    st.error("Please upload at least one PDF.")
+                raw_text = get_pdf_text(pdf_docs)
+                text_chunks = get_text_chunks(raw_text)
+                create_vector_store(text_chunks)
+                st.success("PDFs processed successfully! You can now ask questions.")
 
         question = st.text_input("Ask a Question from the PDFs:")
         if question:
@@ -147,31 +144,42 @@ def main():
                 answer = query_pdf(question)
                 st.write("Response:", answer)
 
-        if detect_wakeword():
-            st.info("Voice chat activated. Speak your query.")
-            voice_question = speech_to_text()
-            if voice_question:
-                with st.spinner("Thinking..."):
-                    answer = query_pdf(voice_question)
-                    st.write("Response:", answer)
-                    text_to_speech(answer)
-
-    elif bot_type == "ChatGPT Clone":
-        st.subheader("ChatGPT Clone: Ask Anything!")
+    elif bot_type == "ChatBot (Typing)":
+        st.subheader("ChatBot (Typing): General Chat")
         query = st.text_input("Ask your question here:")
         if query:
             with st.spinner("Thinking..."):
                 answer = general_chatbot_response(query)
                 st.write("Response:", answer)
 
-        if detect_wakeword():
-            st.info("Voice chat activated. Speak your query.")
-            voice_query = speech_to_text()
-            if voice_query:
-                with st.spinner("Thinking..."):
-                    answer = general_chatbot_response(voice_query)
-                    st.write("Response:", answer)
-                    text_to_speech(answer)
+    elif bot_type == "ChatBot (Voice)":
+        st.subheader("ChatBot (Voice): Talk with Bahul's Bot")
+        if st.button("Start Voice Call"):
+            st.info("Speak your query. End call when done.")
+            end_call = False
+            while not end_call:
+                voice_query = speech_to_text()
+                if voice_query.lower() == "end call":
+                    end_call = True
+                    st.success("Call ended.")
+                else:
+                    with st.spinner("Thinking..."):
+                        answer = general_chatbot_response(voice_query)
+                        st.write("Response:", answer)
+                        text_to_speech(answer)
+
+    elif bot_type == "Alexa-like Bot":
+        st.subheader("Alexa-like Bot: Always Listening")
+        while True:
+            if detect_wakeword():
+                st.success("Wake word detected: 'UP'")
+                st.info("Listening for your query...")
+                voice_query = speech_to_text()
+                if voice_query:
+                    with st.spinner("Thinking..."):
+                        answer = general_chatbot_response(voice_query)
+                        st.write("Response:", answer)
+                        text_to_speech(answer)
 
 if __name__ == "__main__":
     main()
