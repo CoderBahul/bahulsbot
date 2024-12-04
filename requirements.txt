@@ -16,4 +16,4 @@ pvporcupine
 sounddevice
 sentence-transformers
 python-dotenv
-sounddevice
+pyaudio @ 2.whl
