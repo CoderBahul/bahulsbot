@@ -1,9 +1,11 @@
-import os
+import os 
 import streamlit as st
 import speech_recognition as sr
 from gtts import gTTS
+import sounddevice as sd
+import numpy as np
 import pydub.playback
-from pydub import AudioSegment
+from pydub import AudioSegment  
 import tempfile
 from PyPDF2 import PdfReader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -36,7 +38,7 @@ def text_to_speech(text):
         pydub.playback.play(fast_audio)
 
 def speech_to_text():
-    """Convert speech to text."""
+    """Convert speech to text using sounddevice for audio capture."""
     recognizer = sr.Recognizer()
     with sr.Microphone() as source:
         try:
@@ -49,7 +51,7 @@ def speech_to_text():
             return "Error with the speech recognition service."
 
 def detect_wakeword():
-    """Continuously listen for the wake word 'UP'."""
+    """Continuously listen for the wake word 'UP' using sounddevice."""
     recognizer = sr.Recognizer()
     with sr.Microphone() as source:
         while True:
