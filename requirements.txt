@@ -16,4 +16,4 @@ pvporcupine
 sounddevice
 sentence-transformers
 python-dotenv
-2.whl
+PyAudio-0.2.14-cp39-cp39-win_amd64.whl
